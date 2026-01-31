@@ -139,10 +139,54 @@ Verdict?"""
     print(f"TOTAL COST: ${total_cost:.6f}")
     print(f"{'=' * 70}")
 
+def run_incremental_debate(internal_fact: str, full_claim: str):
+    # Split the claim by sentences (simple split for demonstration)
+    sentences = [s.strip() for s in full_claim.split('.') if s.strip()]
+    cumulative_claim = ""
+    total_cost = 0
+    
+    print(f"FACT BASE: {internal_fact}\n")
+
+    for i, sentence in enumerate(sentences):
+        cumulative_claim += sentence + ". "
+        print(f"\n{'#' * 70}")
+        print(f"PROCESSING SEGMENT {i+1}: {sentence}")
+        print(f"{'#' * 70}")
+
+        # The context for this round includes the fact and the claim-so-far
+        round_context = f"FACT: {internal_fact}\nCLAIM SO FAR: {cumulative_claim}\nCURRENT SEGMENT: {sentence}"
+
+        # 1. Sceptic looks for the immediate lie/exaggeration in this sentence
+        sceptic_task = [{"role": "user", "content": f"{round_context}\nSceptic, what is wrong with this specific segment?"}]
+        s_res = get_agent_response("Sceptic", AGENTS["Sceptic"], sceptic_task)
+        
+        # 2. Defender tries to justify the segment based on the fact
+        defender_task = [{"role": "user", "content": f"{round_context}\nSceptic said: {s_res['content']}\nDefender, justify this segment."}]
+        d_res = get_agent_response("Defender", AGENTS["Defender"], defender_task)
+
+        print(f"\n[SCEPTIC]: {s_res['content']}")
+        print(f"\n[DEFENDER]: {d_res['content']}")
+
+        # 3. Intermediate Jury Verdict for this segment
+        jury_task = [{"role": "user", "content": f"{round_context}\nDebate:\nS: {s_res['content']}\nD: {d_res['content']}\nVerdict for this segment?"}]
+        j_res = get_agent_response("Jury", JURY_PROMPT, jury_task)
+        
+        print(f"\n--- SEGMENT {i+1} VERDICT ---\n{j_res['content']}")
+        
+        total_cost += s_res['cost'] + d_res['cost'] + j_res['cost']
+        time.sleep(1) # Visual pacing
+
+    print(f"\n{'=' * 70}\nFINAL SESSION COST: ${total_cost:.6f}\n{'=' * 70}")
+
+
 
 if __name__ == "__main__":
-    internal_fact = """As of April 1 , 103 of 122 ( 84 % ) COVID-19 deaths were in patients aged 70 or older , and no one younger than 50 was known to have died from the disease in Massachusetts ."""
+    # internal_fact = """As of April 1 , 103 of 122 ( 84 % ) COVID-19 deaths were in patients aged 70 or older , and no one younger than 50 was known to have died from the disease in Massachusetts ."""
 
-    external_claim = """After 1st April , more than 125 of the more than 150 COVID-19 deaths were from patients aged 70 and above ."""
+    # external_claim = """After 1st April , more than 125 of the more than 150 COVID-19 deaths were from patients aged 70 and above ."""
 
-    run_debate(internal_fact, external_claim)
+    # run_debate(internal_fact, external_claim)
+
+    fact = "As of April 1, 103 of 122 COVID-19 deaths were in patients aged 70 or older in MA."
+    claim = "After 1st April, more than 125 deaths occurred. Most were 70 and above. This proves the youth were safe."
+    run_incremental_debate(fact, claim)
